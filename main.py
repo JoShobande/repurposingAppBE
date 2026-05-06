@@ -25,15 +25,20 @@ def get_youtube_id(url):
     return None
 
 
-def extractionLogic(youtubeUrl:str):
-    video_id = get_youtube_id(youtubeUrl)
-    result = ytt_api.fetch(video_id) 
+def extraction_logic(youtube_url:str):
+    
+    video_id = get_youtube_id(youtube_url)
+
     try:
+        result = ytt_api.fetch(video_id) 
+        whole_text = ""
         for snippets in result:
-            
-            return (snippets.text)
+            whole_text += snippets.text
+        return whole_text
     except:
-        print("Something went wrong")
+        return "No transcript available for this video"
+   
+
     
 
 
@@ -47,10 +52,12 @@ def root():
 @app.post("/repurpose/")
 async def repurpose_content(data: RepurposeRequest):
     if "youtube" in data.url:
-        return 'youtube'
+       result = extraction_logic(data.url)
+       return result
     else:
         return 'blog'
     
 
 
-extractionLogic('https://www.youtube.com/watch?v=F4rN2OaMdcs')
+
+
