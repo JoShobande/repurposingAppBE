@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from youtube_transcript_api import YouTubeTranscriptApi
 from urllib.parse import urlparse, parse_qs
-
+import requests
+from bs4 import BeautifulSoup
 
 ytt_api = YouTubeTranscriptApi()
 app = FastAPI()
@@ -39,7 +40,19 @@ def extraction_logic(youtube_url:str):
         return "No transcript available for this video"
    
 
+
+def blog_extraction(blog_url:str):
+    whole_text = ""
+    try:
+        html_data = requests.get(blog_url)
+        parser_result = BeautifulSoup(html_data.content, "html.parser")
+        for tags in parser_result.find_all(['h1','h2', 'h3', 'p',]):
+            whole_text+= tags.text
+        return whole_text
+    except:
+        return 'an error occured. try again'
     
+     
 
 
 
@@ -55,7 +68,12 @@ async def repurpose_content(data: RepurposeRequest):
        result = extraction_logic(data.url)
        return result
     else:
-        return 'blog'
+        result = blog_extraction(data.url)
+        return result
+        
+    
+
+blog_extraction('https://thathtml.blog/')
     
 
 
