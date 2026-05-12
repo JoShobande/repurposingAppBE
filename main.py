@@ -4,13 +4,22 @@ from youtube_transcript_api import YouTubeTranscriptApi
 from urllib.parse import urlparse, parse_qs
 import requests
 from bs4 import BeautifulSoup
+import anthropic
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 ytt_api = YouTubeTranscriptApi()
 app = FastAPI()
 
 class RepurposeRequest(BaseModel):
     url: str
+    platform: str
 
+client = anthropic.Anthropic(
+    api_key=os.getenv("ANTHROPIC_KEY")
+)
 
 def get_youtube_id(url):
     parsed = urlparse(url)
@@ -26,7 +35,7 @@ def get_youtube_id(url):
     return None
 
 
-def extraction_logic(youtube_url:str):
+def youtube_extraction(youtube_url:str):
     
     video_id = get_youtube_id(youtube_url)
 
@@ -54,26 +63,49 @@ def blog_extraction(blog_url:str):
     
      
 
-
+def generate_content(extracted_text:str, platform:str):
+    prompt = (
+        f"come up with an engaging content for {platform} using the context discussed in the following text. "
+        f"repurpose it to fit {platform}'s audience. make it very interesting and engaging. "
+        f"Let the number of characters be less or equal to the maximum number of characters allowed in the {platform} (if any limit) per thread. "
+        f"if repurposing for twitter or thread, Come up with not more than 4 tweets or threads for the entire thread. "
+        f"The generated content should include key words surrounding the context that will grab peoples attention. "
+        f"the hook should also be eye catching. "
+        f"Return the response in a json format separating each tweet if repurposing for twitter or thread."
+        f"Below is the extracted text:" +
+        extracted_text
+    )
+    try:
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1000,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+        )
+        return message.content
+    except Exception as e:
+        return str(e)
 
 
 @app.get("/")
 def root():
     return {"Hello": "World"}
-
+    
 
 @app.post("/repurpose/")
 async def repurpose_content(data: RepurposeRequest):
     if "youtube" in data.url:
-       result = extraction_logic(data.url)
-       return result
+       result = youtube_extraction(data.url)
     else:
         result = blog_extraction(data.url)
-        return result
+    return generate_content(result, data.platform)
         
     
 
-blog_extraction('https://thathtml.blog/')
     
 
 
