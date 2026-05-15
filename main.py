@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 import anthropic
 import os
 from dotenv import load_dotenv
+import json
 
 load_dotenv()
 
@@ -86,7 +87,10 @@ def generate_content(extracted_text:str, platform:str):
                 }
             ],
         )
-        return message.content
+        raw_json = message.content[0].text
+        message_without_prefix = raw_json.removeprefix('```json\n')
+        clean_message = message_without_prefix.removesuffix('\n```')
+        return json.loads(clean_message)
     except Exception as e:
         return str(e)
 
