@@ -8,8 +8,18 @@ import anthropic
 import os
 from dotenv import load_dotenv
 import json
+import os
+from supabase import create_client, Client
 
 load_dotenv()
+
+client = anthropic.Anthropic(
+    api_key=os.getenv("ANTHROPIC_KEY")
+)
+
+url: str = os.environ.get("SUPABASE_URL")
+key: str = os.environ.get("SUPABASE_KEY")
+supabase: Client = create_client(url, key)
 
 ytt_api = YouTubeTranscriptApi()
 app = FastAPI()
@@ -18,9 +28,7 @@ class RepurposeRequest(BaseModel):
     url: str
     platform: str
 
-client = anthropic.Anthropic(
-    api_key=os.getenv("ANTHROPIC_KEY")
-)
+
 
 def get_youtube_id(url):
     parsed = urlparse(url)
@@ -64,7 +72,7 @@ def blog_extraction(blog_url:str):
     
      
 
-def generate_content(extracted_text:str, platform:str):
+def generate_content(url, extracted_text:str, platform:str):
     prompt = (
         f"come up with an engaging content for {platform} using the context discussed in the following text. "
         f"repurpose it to fit {platform}'s audience. make it very interesting and engaging. "
@@ -90,6 +98,7 @@ def generate_content(extracted_text:str, platform:str):
         raw_json = message.content[0].text
         message_without_prefix = raw_json.removeprefix('```json\n')
         clean_message = message_without_prefix.removesuffix('\n```')
+        save_history(url, platform, clean_message)
         return json.loads(clean_message)
     except Exception as e:
         return str(e)
@@ -98,6 +107,21 @@ def generate_content(extracted_text:str, platform:str):
 @app.get("/")
 def root():
     return {"Hello": "World"}
+
+
+user_id = '123dfghji'
+
+
+def save_history(url: str, platform:str, generated_content:str):
+    try:
+        response = (
+            supabase.table("history")
+            .insert({"url": url, "platform": platform, "generated_content": generated_content})
+            .execute()
+        )
+        print(response)
+    except Exception as e:
+        print(e)
     
 
 @app.post("/repurpose/")
@@ -106,7 +130,7 @@ async def repurpose_content(data: RepurposeRequest):
        result = youtube_extraction(data.url)
     else:
         result = blog_extraction(data.url)
-    return generate_content(result, data.platform)
+    return generate_content(data.url, result, data.platform)
         
     
 
