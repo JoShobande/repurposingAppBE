@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.params import Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 from youtube_transcript_api import YouTubeTranscriptApi
 from urllib.parse import urlparse, parse_qs
@@ -10,6 +12,20 @@ from dotenv import load_dotenv
 import json
 import os
 from supabase import create_client, Client
+from jose import jwt, JWTError
+
+JWKS = {
+  "keys": [
+    {
+      "x": "HCelQmnxhf6qw5U2klSsaDmeaKA_ST7gep6-ZAi1bxs",
+      "y": "5NsPPzXSxjyjj96VxJoOwg3Mn1BwmFi3O83mI7WIUGE",
+      "alg": "ES256",
+      "crv": "P-256",
+      "kid": "b7ca224e-7fa8-443e-b506-a49a08a838a1",
+      "kty": "EC"
+    }
+  ]
+}
 
 load_dotenv()
 
@@ -104,13 +120,6 @@ def generate_content(url, extracted_text:str, platform:str):
         return str(e)
 
 
-@app.get("/")
-def root():
-    return {"Hello": "World"}
-
-
-user_id = '123dfghji'
-
 
 def save_history(url: str, platform:str, generated_content:str):
     try:
@@ -122,10 +131,22 @@ def save_history(url: str, platform:str, generated_content:str):
         print(response)
     except Exception as e:
         print(e)
-    
+
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+    token = credentials.credentials
+    secret = os.getenv("SUPABASE_JWT_PUBLIC_KEY")
+    print("TOKEN:", token[:20])  # print first 20 chars
+    print("SECRET:", secret[:10] if secret else "NOT FOUND")  # confirm secret loaded
+    try:
+        payload = jwt.decode(token, JWKS, algorithms=["ES256"], options={"verify_aud": False})
+        return payload
+    except JWTError as e:
+        raise HTTPException(status_code=401, detail="not authorized")
+        
 
 @app.post("/repurpose/")
-async def repurpose_content(data: RepurposeRequest):
+async def repurpose_content(data: RepurposeRequest, token: HTTPAuthorizationCredentials = Depends(verify_token)):
     if "youtube" in data.url:
        result = youtube_extraction(data.url)
     else:
