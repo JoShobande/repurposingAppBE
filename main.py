@@ -135,7 +135,6 @@ def save_history(url: str, platform:str, generated_content:str):
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
     token = credentials.credentials
-    secret = os.getenv("SUPABASE_JWT_PUBLIC_KEY")
     try:
         payload = jwt.decode(token, JWKS, algorithms=["ES256"], options={"verify_aud": False})
         return payload
